@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStudentRequest;
 use App\Http\Requests\UpdateStudentRequest;
 use App\Services\StudentService;
+use Illuminate\Http\Request;
 
 class StudentController extends Controller
 {
@@ -17,16 +18,26 @@ class StudentController extends Controller
     }
 
     // Get all students
-    public function index()
-    {
-        $students = $this->studentService->getAllStudents();
+    public function index(Request $request)
+{
+    $students = $this->studentService->getAllStudents(
+        $request->search
+    );
 
+    if ($students->isEmpty()) {
         return response()->json([
-            'success' => true,
-            'message' => 'Students retrieved successfully',
-            'data' => $students
-        ], 200);
+            'success' => false,
+            'message' => 'No students found',
+            'data' => []
+        ], 404);
     }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Students retrieved successfully',
+        'data' => $students
+    ], 200);
+}
 
     // Get student by ID
     public function show($id)
