@@ -21,7 +21,7 @@ class StudentController extends Controller
     public function index(Request $request)
 {
     $students = $this->studentService->getAllStudents(
-        $request->search
+        $request->search ?? null
     );
 
     if ($students->isEmpty()) {
