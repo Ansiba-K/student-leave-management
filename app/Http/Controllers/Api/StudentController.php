@@ -107,4 +107,6 @@ class StudentController extends Controller
             'message' => 'Student deleted successfully'
         ], 200);
     }
+
+   
 }
