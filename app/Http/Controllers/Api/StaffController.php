@@ -13,22 +13,24 @@ class StaffController extends Controller
     protected $staffService;
     public function __construct(StaffService $staffService)
     {
-         $this->staffService = $staffService;
+        $this->staffService = $staffService;
     }
 
     // Get all staff
-    public function index(){
+    public function index()
+    {
         $staff = $this->staffService->getAllStaff();
 
         return response()->Json([
-            'success'=> true,
-            'meassage'=>'Staff retrieved successfully',
+            'success' => true,
+            'meassage' => 'Staff retrieved successfully',
             'data' => $staff
-        ],200);
+        ], 200);
     }
 
     // get by id
-    public function show($id){
+    public function show($id)
+    {
         $staff = $this->staffService->getStaffById($id);
 
         if ($staff === null) {
@@ -46,17 +48,17 @@ class StaffController extends Controller
     }
 
     // create a new staff
-    public function store(StoreStaffRequest $request){
+    public function store(StoreStaffRequest $request)
+    {
         $staff = $this->staffService->addStaff(
             $request->validated()
-            );
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'Staff created successfully',
             'data' => $staff
         ], 201);
-
     }
 
     // Update an existing staff member
@@ -83,7 +85,8 @@ class StaffController extends Controller
 
     // delete existing staff
 
-    public function destroy($id){
+    public function destroy($id)
+    {
         $staff = $this->staffService->deleteStaff($id);
 
         if ($staff === null) {
@@ -106,6 +109,4 @@ class StaffController extends Controller
             'message' => 'Staff deleted successfully',
         ], 200);
     }
-
 }
-

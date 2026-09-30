@@ -4,9 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-use Override;
-
-class UpdateStudentRequest extends FormRequest
+class LeaveFilterRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,17 +22,8 @@ class UpdateStudentRequest extends FormRequest
      * @return array
      */
     public function rules()
-    {
-        return [
-            'name' => 'required|string',
-
-            'email' => 'required|email|unique:students,email,' . $this->route('id'),
-
-            'phone' => 'required|string',
-
-            'course' => 'required|string',
-
-            'department_id' => 'required|exists:departments,id',
-        ];
+    { {
+            return ['status' => 'nullable|integer|in:1,2,3,4',];
+        }
     }
 }
