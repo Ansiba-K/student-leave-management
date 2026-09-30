@@ -64,12 +64,3 @@ Route::prefix('students')->group(function () {
     Route::delete('/{id}', [StudentController::class, 'destroy']);
 });
 
-Route::get('/test-email', function () {
-
-    Mail::to('test@example.com')->send(new TestMail());
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Email sent successfully'
-    ]);
-});
