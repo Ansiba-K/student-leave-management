@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Leave;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LeaveAppliedMail;
 
 class LeaveService
 {
@@ -20,6 +22,19 @@ class LeaveService
         if ($existingLeave) {
             return false;
         }
+
+        // Get the student details
+        $student = DB::table('students')
+            ->where('id', $data['student_id'])
+            ->first();
+
+        // Find authority staff and HOD from the student's department
+        $approvers = DB::table('staff')
+            ->where('department_id', $student->department_id)
+            ->where('is_authority', 1)
+            ->whereIn('role', [1, 2])
+            ->pluck('email')
+            ->toArray();
 
         // Calculate total leave days
         $fromDate = \Carbon\Carbon::parse($data['from_date']);
@@ -40,6 +55,12 @@ class LeaveService
             ->first();
 
         $leave->total_leave_days = $totalLeaveDays;
+
+        // Send email to authority staff and HOD
+        if (!empty($approvers)) {
+            Mail::to($approvers)
+                ->send(new LeaveAppliedMail($leave, $student));
+        }
         return $leave;
     }
 

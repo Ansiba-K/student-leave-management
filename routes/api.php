@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\LeaveController;
 use  App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\StudentController;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\TestMail;
 
 
 /*
@@ -60,4 +62,14 @@ Route::prefix('students')->group(function () {
     Route::get('/{id}', [StudentController::class, 'show']);
     Route::put('/{id}', [StudentController::class, 'update']);
     Route::delete('/{id}', [StudentController::class, 'destroy']);
+});
+
+Route::get('/test-email', function () {
+
+    Mail::to('test@example.com')->send(new TestMail());
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Email sent successfully'
+    ]);
 });
