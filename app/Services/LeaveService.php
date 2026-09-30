@@ -205,29 +205,20 @@ class LeaveService
             $rejectionReason = null;
         }
 
-        // Update the leave
+        // update leave status
         DB::table('leaves')
             ->where('id', $leaveId)
             ->update([
                 'status' => $status,
-                'approved_by' => $staffId,
+                'approved_by' => $status == 2 ? $staffId : null,
+                'rejected_by' => $status == 3 ? $staffId : null,
                 'rejection_reason' => $rejectionReason,
                 'updated_at' => now(),
             ]);
 
 
-        $leave = DB::table('leaves')
+        return DB::table('leaves')
             ->where('id', $leaveId)
             ->first();
-
-        // Show different field names in the response
-        if ($leave->status == 2) {
-            $leave->approved_by = $leave->approved_by;
-        } elseif ($leave->status == 3) {
-            $leave->rejected_by = $leave->approved_by;
-            unset($leave->approved_by);
-        }
-
-        return $leave;
     }
 }
