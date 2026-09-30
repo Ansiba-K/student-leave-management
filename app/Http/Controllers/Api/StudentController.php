@@ -19,25 +19,25 @@ class StudentController extends Controller
 
     // Get all students
     public function index(Request $request)
-{
-    $students = $this->studentService->getAllStudents(
-        $request->search ?? null
-    );
+    {
+        $students = $this->studentService->getAllStudents(
+            $request->search ?? null
+        );
 
-    if ($students->isEmpty()) {
+        if ($students->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No students found',
+                'data' => []
+            ], 404);
+        }
+
         return response()->json([
-            'success' => false,
-            'message' => 'No students found',
-            'data' => []
-        ], 404);
+            'success' => true,
+            'message' => 'Students retrieved successfully',
+            'data' => $students
+        ], 200);
     }
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Students retrieved successfully',
-        'data' => $students
-    ], 200);
-}
 
     // Get student by ID
     public function show($id)
@@ -118,6 +118,4 @@ class StudentController extends Controller
             'message' => 'Student deleted successfully'
         ], 200);
     }
-
-   
 }

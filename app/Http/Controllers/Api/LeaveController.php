@@ -6,11 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreLeaveRequest;
 use App\Services\LeaveService;
-use App\Http\Requests\ApproveLeaveRequest;
-use App\Http\Requests\RejectLeaveRequest;
 use App\Http\Requests\CancelLeaveRequest;
-use App\Http\Requests\StaffLeaveRequest;
 use App\Http\Requests\UpdateLeaveStatusRequest;
+use App\Http\Requests\LeaveFilterRequest;
 
 class LeaveController extends Controller
 {
@@ -21,6 +19,7 @@ class LeaveController extends Controller
         $this->leaveService = $leaveService;
     }
 
+    // create leave
     public function store(StoreLeaveRequest $request)
     {
         $leave = $this->leaveService->applyLeave(
@@ -41,7 +40,8 @@ class LeaveController extends Controller
         ], 201);
     }
 
-    public function index(StaffLeaveRequest $request)
+    // get all leaves
+    public function index(LeaveFilterRequest $request)
     {
         $leaves = $this->leaveService->getAllLeaves(
             $request->status
@@ -55,7 +55,7 @@ class LeaveController extends Controller
     }
 
 
-
+    // get student with leave
     public function studentLeaves($student_id)
     {
         $leaves = $this->leaveService->getStudentLeaves($student_id);
@@ -82,6 +82,8 @@ class LeaveController extends Controller
         ]);
     }
 
+
+    // cancel student leave
     public function cancel($student_id, CancelLeaveRequest $request)
     {
         $leave = $this->leaveService->cancelLeave(
@@ -125,6 +127,7 @@ class LeaveController extends Controller
     }
 
 
+    // student leave approve or reject
     public function updateStatus($id, UpdateLeaveStatusRequest $request)
     {
         $leave = $this->leaveService->updateLeaveStatus(

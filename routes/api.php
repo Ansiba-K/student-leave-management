@@ -23,12 +23,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// leave routes
 Route::post('/leaves', [LeaveController::class, 'store']);
 Route::get('/leaves/student/{student_id}', [LeaveController::class, 'studentLeaves']);
 Route::put('/leaves/student/{student_id}/cancel', [LeaveController::class, 'cancel']);
 
 // staff routes
-Route::prefix('staff')->group(function(){
+Route::prefix('staff')->group(function () {
     // Staff leave management
     Route::get('/leaves', [LeaveController::class, 'index']);
     Route::put('/leaves/{id}', [LeaveController::class, 'updateStatus']);
@@ -42,7 +43,7 @@ Route::prefix('staff')->group(function(){
 });
 
 // department routes
-Route::prefix('departments')->group(function(){
+Route::prefix('departments')->group(function () {
     Route::post('/', [DepartmentController::class, 'store']);
     Route::get('/', [DepartmentController::class, 'index']);
     Route::get('/{id}', [DepartmentController::class, 'show']);
@@ -59,8 +60,4 @@ Route::prefix('students')->group(function () {
     Route::get('/{id}', [StudentController::class, 'show']);
     Route::put('/{id}', [StudentController::class, 'update']);
     Route::delete('/{id}', [StudentController::class, 'destroy']);
-
 });
-
-
-

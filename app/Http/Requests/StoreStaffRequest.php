@@ -3,8 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Http\Exceptions\HttpResponseException;
+
 use Override;
 
 class StoreStaffRequest extends FormRequest
@@ -36,42 +35,5 @@ class StoreStaffRequest extends FormRequest
             'is_authority' => 'required|boolean',
 
         ];
-    }
-
-
-    public function messages()
-    {
-        return [
-            'name.required' => 'Staff name is required',
-            'name.string' => 'Staff name must be a string',
-
-            'email.required' => 'Staff email is required',
-            'email.email' => 'Staff email is not valid',
-            'email.unique' => 'Staff email already exists',
-
-            'phone.required' => 'Staff phone is required',
-            'phone.string' => 'Staff phone must be a string',
-
-            'department_id.exists' => 'Department does not exist',
-            'department_id.required_unless' =>'Department is required for Staff and HOD',
-
-            'role.required' => 'Role is required',
-            'role.integer' => 'Role must be an integer',
-            'role.in' => 'Role must be 1 (Staff), 2 (HOD), or 3 (Principal)',
-
-            'is_authority.required' => 'Authority status is required',
-            'is_authority.boolean' => 'Authority status must be 0 or 1',
-        ];
-    }
-
-    protected function failedValidation(Validator $validator)
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422)
-        );
     }
 }

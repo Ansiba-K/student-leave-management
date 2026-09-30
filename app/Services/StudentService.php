@@ -24,34 +24,34 @@ class StudentService
     }
     // Get all students
     public function getAllStudents($search = null)
-{
-    $query = DB::table('students')
-        ->join(
-            'departments',
-            'students.department_id',
-            '=',
-            'departments.id'
-        )
-        ->select(
-            'students.id',
-            'students.name',
-            'students.email',
-            'students.phone',
-            'students.course',
-            'students.department_id',
-            'departments.name as department_name'
-        );
+    {
+        $query = DB::table('students')
+            ->join(
+                'departments',
+                'students.department_id',
+                '=',
+                'departments.id'
+            )
+            ->select(
+                'students.id',
+                'students.name',
+                'students.email',
+                'students.phone',
+                'students.course',
+                'students.department_id',
+                'departments.name as department_name'
+            );
 
-    if ($search) {
-        $query->where(function ($q) use ($search) {
-            $q->where('students.name', 'like', '%' . $search . '%')
-              ->orWhere('students.email', 'like', '%' . $search . '%')
-              ->orWhere('students.course', 'like', '%' . $search . '%');
-        });
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('students.name', 'like', '%' . $search . '%')
+                    ->orWhere('students.email', 'like', '%' . $search . '%')
+                    ->orWhere('students.course', 'like', '%' . $search . '%');
+            });
+        }
+
+        return $query->get();
     }
-
-    return $query->get();
-}
 
     // Get student by ID
     public function getStudentById($id)
