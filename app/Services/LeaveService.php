@@ -216,8 +216,18 @@ class LeaveService
             ]);
 
 
-        return DB::table('leaves')
+        $leave = DB::table('leaves')
             ->where('id', $leaveId)
             ->first();
+
+        // Show different field names in the response
+        if ($leave->status == 2) {
+            $leave->approved_by = $leave->approved_by;
+        } elseif ($leave->status == 3) {
+            $leave->rejected_by = $leave->approved_by;
+            unset($leave->approved_by);
+        }
+
+        return $leave;
     }
 }
