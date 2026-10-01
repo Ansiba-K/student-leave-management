@@ -9,7 +9,7 @@ use App\Mail\LeaveAppliedMail;
 
 class LeaveService
 {
-    public function applyLeave(array $data)
+    public function applyStudentLeave(array $data)
     {
 
         $existingLeave = DB::table('leaves')
@@ -42,6 +42,10 @@ class LeaveService
 
         $totalLeaveDays = $fromDate->diffInDays($toDate) + 1;
 
+
+        // student apply leave
+        $data['applicant_type'] = 1;
+        $data['staff_id'] = null;
         $data['status'] = 1;
         $data['approved_by'] = null;
         $data['rejection_reason'] = null;
@@ -56,57 +60,203 @@ class LeaveService
 
         $leave->total_leave_days = $totalLeaveDays;
 
+        $response = [
+            'leave_id' => $leave->id,
+            'student_id' => $leave->student_id,
+            'from_date' => $leave->from_date,
+            'to_date' => $leave->to_date,
+            'total_leave_days' => $totalLeaveDays,
+            'reason' => $leave->reason,
+            'status' => 'Pending',
+        ];
+
         // Send email to authority staff and HOD
         if (!empty($approvers)) {
             Mail::to($approvers)
                 ->send(new LeaveAppliedMail($leave, $student));
         }
+        return $response;
+    }
+
+    public function applyStaffLeave($data)
+    {
+        // Get the staff member who is applying for leave
+        $staff = DB::table('staff')
+            ->where('id', $data['staff_id'])
+            ->first();
+
+
+        $existingLeave = DB::table('leaves')
+            ->where('staff_id', $data['staff_id'])
+            ->where('applicant_type', 2)
+            ->whereIn('status', [1, 2])
+            ->where('from_date', '<=', $data['to_date'])
+            ->where('to_date', '>=', $data['from_date'])
+            ->first();
+
+        if ($existingLeave) {
+            return false;
+        }
+
+        // Calculate total leave days
+        $fromDate = \Carbon\Carbon::parse($data['from_date']);
+        $toDate = \Carbon\Carbon::parse($data['to_date']);
+
+        $totalLeaveDays = $fromDate->diffInDays($toDate) + 1;
+
+        $data['student_id'] = null;
+        $data['applicant_type'] = 2;
+        $data['status'] = 1;
+        $data['approved_by'] = null;
+        $data['rejected_by'] = null;
+        $data['rejection_reason'] = null;
+        $data['created_at'] = now();
+        $data['updated_at'] = now();
+
+        // Insert the staff leave
+        $id = DB::table('leaves')->insertGetId($data);
+
+        // Get the staff leave with staff name
+        $leave = DB::table('leaves')
+            ->join('staff', 'leaves.staff_id', '=', 'staff.id')
+            ->where('leaves.id', $id)
+            ->select(
+                'leaves.id as leave_id',
+                'leaves.staff_id',
+                'staff.name as staff_name',
+                'leaves.from_date',
+                'leaves.to_date',
+                'leaves.reason',
+                'leaves.status',
+                'leaves.approved_by',
+                'leaves.rejected_by',
+                'leaves.rejection_reason'
+            )
+            ->first();
+
+        $leave->total_leave_days = $totalLeaveDays;
+
+
+        if ($leave->status == 1) {
+            $leave->status = 'Pending';
+        } elseif ($leave->status == 2) {
+            $leave->status = 'Approved';
+        } elseif ($leave->status == 3) {
+            $leave->status = 'Rejected';
+        } elseif ($leave->status == 4) {
+            $leave->status = 'Cancelled';
+        }
+
         return $leave;
     }
 
-    public function getAllLeaves($status = null)
+    public function getAllStudentLeaves($status = null)
     {
-        $query = DB::table('leaves')
+        // Get all leaves submitted by students
+        $leaves = DB::table('leaves')
             ->join('students', 'leaves.student_id', '=', 'students.id')
+            ->where('leaves.applicant_type', 1)
             ->select(
-                'leaves.id',
+                'leaves.id as leave_id',
+                'leaves.student_id',
                 'students.name as student_name',
                 'leaves.from_date',
                 'leaves.to_date',
                 'leaves.reason',
                 'leaves.status',
                 'leaves.approved_by',
+                'leaves.rejected_by',
                 'leaves.rejection_reason'
-            );
+            )
+
+
+            ->orderBy('leaves.id', 'desc');
 
         if ($status !== null) {
-            $query->where('leaves.status', $status);
+            $leaves->where('leaves.status', $status);
         }
-        $leaves = $query->get();
+        $leaves = $leaves->get();
 
+        // Calculate total leave days
         foreach ($leaves as $leave) {
             $fromDate = \Carbon\Carbon::parse($leave->from_date);
             $toDate = \Carbon\Carbon::parse($leave->to_date);
+
             $leave->total_leave_days = $fromDate->diffInDays($toDate) + 1;
+
+            // Convert numeric status to readable status
+            if ($leave->status == 1) {
+                $leave->status = 'Pending';
+            } elseif ($leave->status == 2) {
+                $leave->status = 'Approved';
+            } elseif ($leave->status == 3) {
+                $leave->status = 'Rejected';
+            } elseif ($leave->status == 4) {
+                $leave->status = 'Cancelled';
+            }
         }
+
+        return $leaves;
+    }
+
+
+    // Get all leaves submitted by staff
+    public function getAllStaffLeaves($status = null)
+    {
+
+        $leaves = DB::table('leaves')
+            ->join('staff', 'leaves.staff_id', '=', 'staff.id')
+            ->where('leaves.applicant_type', 2)
+            ->select(
+                'leaves.id as leave_id',
+                'leaves.staff_id',
+                'staff.name as staff_name',
+                'leaves.from_date',
+                'leaves.to_date',
+                'leaves.reason',
+                'leaves.status',
+                'leaves.approved_by',
+                'leaves.rejected_by',
+                'leaves.rejection_reason'
+            )
+            ->orderBy('leaves.id', 'desc');
+
+        if ($status !== null) {
+            $leaves->where('leaves.status', $status);
+        }
+        $leaves = $leaves->get();
+
+        // Calculate total leave days
+        foreach ($leaves as $leave) {
+            $fromDate = \Carbon\Carbon::parse($leave->from_date);
+            $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+            $leave->total_leave_days = $fromDate->diffInDays($toDate) + 1;
+
+            // Convert numeric status to readable status
+            if ($leave->status == 1) {
+                $leave->status = 'Pending';
+            } elseif ($leave->status == 2) {
+                $leave->status = 'Approved';
+            } elseif ($leave->status == 3) {
+                $leave->status = 'Rejected';
+            } elseif ($leave->status == 4) {
+                $leave->status = 'Cancelled';
+            }
+        }
+
         return $leaves;
     }
 
 
 
-    public function getStudentLeaves(int $studentId)
-
+    public function getStudentLeaves($studentId, $status = null)
     {
-
-        $student = DB::table('students')
-            ->where('id', $studentId)
-            ->first();
-
-        if (!$student) {
-            return null;
-        }
-        return DB::table('leaves')
+        // Get leaves for the selected student
+        $query = DB::table('leaves')
+            ->join('students', 'leaves.student_id', '=', 'students.id')
             ->where('leaves.student_id', $studentId)
+            ->where('leaves.applicant_type', 1)
             ->select(
                 'leaves.id',
                 'leaves.student_id',
@@ -116,31 +266,101 @@ class LeaveService
                 'leaves.status',
                 'leaves.rejection_reason'
             )
-            ->get();
+            ->orderBy('leaves.id', 'desc');
+
+        // Apply status filter
+        if ($status !== null) {
+            $query->where('leaves.status', $status);
+        }
+
+        $leaves = $query->get();
+
+        // Calculate days and convert status
+        foreach ($leaves as $leave) {
+
+            $fromDate = \Carbon\Carbon::parse($leave->from_date);
+            $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+            $leave->total_leave_days =
+                $fromDate->diffInDays($toDate) + 1;
+
+            if ($leave->status == 1) {
+                $leave->status = 'Pending';
+            } elseif ($leave->status == 2) {
+                $leave->status = 'Approved';
+            } elseif ($leave->status == 3) {
+                $leave->status = 'Rejected';
+            } elseif ($leave->status == 4) {
+                $leave->status = 'Cancelled';
+            }
+        }
+
+        return $leaves;
+    }
+
+    public function getStaffLeaves(int $staffId, $status = null)
+    {
+        // Get leaves for the selected staff
+        $query = DB::table('leaves')
+            ->join('staff', 'leaves.staff_id', '=', 'staff.id')
+            ->where('leaves.staff_id', $staffId)
+            ->where('leaves.applicant_type', 2)
+            ->select(
+                'leaves.id',
+                'leaves.staff_id',
+                'leaves.from_date',
+                'leaves.to_date',
+                'leaves.reason',
+                'leaves.status',
+                'leaves.rejection_reason'
+            )
+            ->orderBy('leaves.id', 'desc');
+
+        // Apply status filter
+        if ($status !== null) {
+            $query->where('leaves.status', $status);
+        }
+
+        $leaves = $query->get();
+
+        // Calculate days and convert status
+        foreach ($leaves as $leave) {
+
+            $fromDate = \Carbon\Carbon::parse($leave->from_date);
+            $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+            $leave->total_leave_days =
+                $fromDate->diffInDays($toDate) + 1;
+
+            if ($leave->status == 1) {
+                $leave->status = 'Pending';
+            } elseif ($leave->status == 2) {
+                $leave->status = 'Approved';
+            } elseif ($leave->status == 3) {
+                $leave->status = 'Rejected';
+            } elseif ($leave->status == 4) {
+                $leave->status = 'Cancelled';
+            }
+        }
+
+        return $leaves;
     }
 
 
-    public function cancelLeave(int $studentId, int $leaveId)
+    public function cancelStudentLeave(int $studentId, int $leaveId)
     {
         $leave = DB::table('leaves')
             ->where('id', $leaveId)
             ->where('student_id', $studentId)
+            ->where('applicant_type', 1)
             ->first();
 
         if (!$leave) {
             return null;
         }
 
-        if ($leave->status == 2) {
-            return 'approved';
-        }
-
-        if ($leave->status == 3) {
-            return 'rejected';
-        }
-
-        if ($leave->status == 4) {
-            return 'cancelled';
+        if ($leave->status != 1) {
+            return 'not_pending';
         }
 
         DB::table('leaves')
@@ -154,6 +374,39 @@ class LeaveService
         return DB::table('leaves')
             ->where('id', $leaveId)
             ->where('student_id', $studentId)
+            ->first();
+    }
+
+    // Cancel a staff leave
+    public function cancelStaffLeave($staffId, $leaveId)
+    {
+        // Find the staff leave
+        $leave = DB::table('leaves')
+            ->where('id', $leaveId)
+            ->where('staff_id', $staffId)
+            ->where('applicant_type', 2)
+            ->first();
+
+        
+        if (!$leave) {
+            return null;
+        }
+
+        // Only pending leave can be cancelled
+        if ($leave->status != 1) {
+            return 'not_pending';
+        }
+
+        // Cancel the leave
+        DB::table('leaves')
+            ->where('id', $leaveId)
+            ->update([
+                'status' => 4,
+                'updated_at' => now(),
+            ]);
+
+        return DB::table('leaves')
+            ->where('id', $leaveId)
             ->first();
     }
 
@@ -183,25 +436,46 @@ class LeaveService
             return 'staff_not_found';
         }
 
-        // Check this staff member has authority
+
         if ($staff->is_authority != 1) {
             return 'not_authorized';
         }
 
-        // Find the student who applied for the leave
-        $student = DB::table('students')
-            ->where('id', $leave->student_id)
-            ->first();
+        // Get the applicant's department
+        if ($leave->applicant_type == 1) {
 
-        if (!$student) {
-            return 'student_not_found';
+
+            $applicant = DB::table('students')
+                ->where('id', $leave->student_id)
+                ->first();
+
+            if (!$applicant) {
+                return 'student_not_found';
+            }
+
+            $applicantDepartmentId = $applicant->department_id;
+        } else {
+
+            // Staff leave
+            $applicant = DB::table('staff')
+                ->where('id', $leave->staff_id)
+                ->first();
+
+            if (!$applicant) {
+                return 'staff_not_found';
+            }
+
+            // Staff cannot approve their own leave
+            if ($leave->staff_id == $staffId) {
+                return 'self_approval_not_allowed';
+            }
+
+            $applicantDepartmentId = $applicant->department_id;
         }
 
-        // Principal 
-        if ($staff->role != 3) {
 
-            // Staff/HOD must belong to the same department
-            if ($staff->department_id != $student->department_id) {
+        if ($staff->role != 3) {
+            if ($staff->department_id != $applicantDepartmentId) {
                 return 'different_department';
             }
         }

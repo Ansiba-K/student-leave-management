@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\DB;
 
 class StaffService
 {
-    public function getAllStaff()
+    public function getAllStaff($type = null, $value = null)
     {
-        return DB::table('staff')
+        $query = DB::table('staff')
             ->leftJoin(
                 'departments',
                 'staff.department_id',
@@ -24,8 +24,23 @@ class StaffService
                 'departments.name as department_name',
                 'staff.role',
                 'staff.is_authority'
-            )
-            ->get();
+            );
+
+            if ($type && $value) {
+            switch ($type) {
+                case '1':
+                    $query->where('staff.name', 'like', '%' . $value . '%');
+                    break;
+                case '2':
+                    $query->where('departments.name', 'like', '%' . $value . '%');
+                    break;
+                case '3':
+                    $query->where('staff.role', 'like', '%' . $value . '%');
+                    
+                    break;
+            }
+        }
+            return $query->get();
     }
 
     // Get staff by ID

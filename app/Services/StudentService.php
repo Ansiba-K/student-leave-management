@@ -23,7 +23,7 @@ class StudentService
         return $this->getStudentById($id);
     }
     // Get all students
-    public function getAllStudents($search = null)
+    public function getAllStudents($type = null, $value = null)
     {
         $query = DB::table('students')
             ->join(
@@ -42,12 +42,18 @@ class StudentService
                 'departments.name as department_name'
             );
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('students.name', 'like', '%' . $search . '%')
-                    ->orWhere('students.email', 'like', '%' . $search . '%')
-                    ->orWhere('students.course', 'like', '%' . $search . '%');
-            });
+        if ($type && $value) {
+            switch ($type) {
+                case '1':
+                    $query->where('students.name', 'like', '%' . $value . '%');
+                    break;
+                case '2':
+                    $query->where('departments.name', 'like', '%' . $value . '%');
+                    break;
+                case '3':
+                    $query->where('students.course', 'like', '%' . $value . '%');
+                    break;
+            }
         }
 
         return $query->get();

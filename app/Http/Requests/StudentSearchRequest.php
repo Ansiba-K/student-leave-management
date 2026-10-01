@@ -4,8 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-
-class StoreLeaveRequest extends FormRequest
+class StudentSearchRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -25,10 +24,8 @@ class StoreLeaveRequest extends FormRequest
     public function rules()
     {
         return [
-            'student_id' => 'required|exists:students,id',
-            'from_date' => 'required|date|after_or_equal:today',
-            'to_date' => 'required|date|after_or_equal:from_date',
-            'reason' => 'required|string',
+            'type' => 'nullable|integer|in:1,2,3',
+            'value' => 'required_with:type|string',
         ];
     }
 }

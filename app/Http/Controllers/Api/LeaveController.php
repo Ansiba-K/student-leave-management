@@ -4,25 +4,33 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Http\Requests\StoreLeaveRequest;
+use App\Http\Requests\StoreStudentLeaveRequest;
+use App\Http\Requests\StoreStaffLeaveRequest;
 use App\Services\LeaveService;
+use App\Services\StaffService;
+use App\Services\StudentService;
 use App\Http\Requests\CancelLeaveRequest;
 use App\Http\Requests\UpdateLeaveStatusRequest;
 use App\Http\Requests\LeaveFilterRequest;
+use App\Http\Requests\CancelStaffLeaveRequest;
 
 class LeaveController extends Controller
 {
     protected $leaveService;
+    protected $staffService;
+    protected $studentService;
 
-    public function __construct(LeaveService $leaveService)
+    public function __construct(LeaveService $leaveService, StaffService $staffService, StudentService $studentService)
     {
         $this->leaveService = $leaveService;
+        $this->staffService = $staffService;
+        $this->studentService = $studentService;
     }
 
-    // create leave
-    public function store(StoreLeaveRequest $request)
+    // create leave for student
+    public function storeStudentLeave(StoreStudentLeaveRequest $request)
     {
-        $leave = $this->leaveService->applyLeave(
+        $leave = $this->leaveService->applyStudentLeave(
             $request->validated()
         );
 
@@ -40,39 +48,91 @@ class LeaveController extends Controller
         ], 201);
     }
 
-    // get all leaves
-    public function index(LeaveFilterRequest $request)
+    // create leave for staff
+    public function storeStaffLeave(StoreStaffLeaveRequest $request)
     {
-        $leaves = $this->leaveService->getAllLeaves(
-            $request->status
+        $leave = $this->leaveService->applyStaffLeave(
+            $request->validated()
         );
+
+        if ($leave === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Staff already has a leave for these dates'
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Leaves retrieved successfully',
+            'message' => 'Staff leave applied successfully',
+            'data' => $leave
+        ], 201);
+    }
+
+    // get all student leaves
+    public function allStudentLeaves(LeaveFilterRequest $request)
+    {
+
+        $status = $request->status;
+        // Get all student leaves
+        $leaves = $this->leaveService->getAllStudentLeaves($status);
+
+        if ($leaves->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data not found',
+                'data' => null
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
             'data' => $leaves
-        ], 200);
+        ]);
+    }
+
+    public function allStaffLeaves(LeaveFilterRequest $request)
+    {
+
+        $status = $request->status;
+        // Get all staff leaves
+        $leaves = $this->leaveService->getAllStaffLeaves($status);
+
+        if ($leaves->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data not found',
+                'data' => null
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $leaves
+        ]);
     }
 
 
     // get student with leave
-    public function studentLeaves($student_id)
+    public function studentLeaves($student_id, LeaveFilterRequest $request)
     {
-        $leaves = $this->leaveService->getStudentLeaves($student_id);
-
-        if ($leaves === null) {
+        $status = $request->status;
+        $student = $this->studentService->getStudentById($student_id);
+        if (!$student) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student does not exist'
+                'message' => 'Student not found'
             ], 404);
         }
 
+        $leaves = $this->leaveService->getStudentLeaves($student_id, $status);
+
         if ($leaves->isEmpty()) {
             return response()->json([
-                'success' => true,
-                'message' => 'Student has not applied for any leave yet',
-                'data' => []
-            ], 200);
+                'success' => false,
+                'message' => 'No leave records found',
+                'data' => null
+            ]);
         }
 
         return response()->json([
@@ -83,10 +143,44 @@ class LeaveController extends Controller
     }
 
 
-    // cancel student leave
-    public function cancel($student_id, CancelLeaveRequest $request)
+
+    // get staff with leave
+    public function staffLeaves($staff_id, LeaveFilterRequest $request)
     {
-        $leave = $this->leaveService->cancelLeave(
+        $status = $request->status;
+
+        $staff = $this->staffService->getStaffById($staff_id);
+
+        if (!$staff) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Staff not found',
+                'data' => null
+            ]);
+        }
+
+        $leaves = $this->leaveService->getStaffLeaves($staff_id, $status);
+
+
+        if ($leaves->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No leave records found',
+                'data' => null
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Staff leaves retrieved successfully',
+            'data' => $leaves
+        ]);
+    }
+
+    // cancel student leave
+    public function cancelStudentLeave($student_id, CancelLeaveRequest $request)
+    {
+        $leave = $this->leaveService->cancelStudentLeave(
             $student_id,
             $request->leave_id
         );
@@ -98,31 +192,65 @@ class LeaveController extends Controller
             ], 404);
         }
 
-        if ($leave === 'approved') {
+        if ($leave === 'not_pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Approved leave cannot be cancelled'
+                'message' => 'Only pending leave can be cancelled'
             ], 422);
         }
+        return response()->json([
+            'success' => true,
+            'message' => 'Leave cancelled successfully',
+            'data' => [
+                'leave_id' => $leave->id,
+                'student_id' => $leave->student_id,
+                'from_date' => $leave->from_date,
+                'to_date' => $leave->to_date,
+                'reason' => $leave->reason,
+                'status' => 'Cancelled'
+            ]
+        ]);
+    }
 
-        if ($leave === 'rejected') {
+    public function cancelStaffLeave(
+        $staff_id,
+        CancelStaffLeaveRequest $request
+    ) {
+        // Cancel staff leave
+        $leave = $this->leaveService->cancelStaffLeave(
+            $staff_id,
+            $request->leave_id
+        );
+
+        // Leave not found for this staff
+        if ($leave === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Rejected leave cannot be cancelled'
-            ], 422);
+                'message' => 'Leave not found for this staff',
+                'data' => null
+            ], 404);
         }
 
-        if ($leave === 'cancelled') {
+        // Leave is already approved/rejected/cancelled
+        if ($leave === 'not_pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Leave is already cancelled'
+                'message' => 'Only pending leave can be cancelled',
+                'data' => null
             ], 422);
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Leave cancelled successfully',
-            'data' => $leave
+            'data' => [
+                'leave_id' => $leave->id,
+                'staff_id' => $leave->staff_id,
+                'from_date' => $leave->from_date,
+                'to_date' => $leave->to_date,
+                'reason' => $leave->reason,
+                'status' => 'Cancelled'
+            ]
         ]);
     }
 
@@ -169,6 +297,13 @@ class LeaveController extends Controller
             ], 403);
         }
 
+        if ($leave === 'self_approval_not_allowed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Staff cannot approve or reject their own leave'
+            ], 403);
+        }
+
 
         if ($leave === 'student_not_found') {
             return response()->json([
@@ -201,12 +336,35 @@ class LeaveController extends Controller
             ], 422);
         }
 
+        $data = [
+            'leave_id' => $leave->id,
+            'from_date' => $leave->from_date,
+            'to_date' => $leave->to_date,
+            'reason' => $leave->reason,
+            'status' => $request->status == 2 ? 'Approved' : 'Rejected',
+        ];
+
+        // Add only the relevant applicant ID
+        if ($leave->applicant_type == 1) {
+            $data['student_id'] = $leave->student_id;
+        } else {
+            $data['staff_id'] = $leave->staff_id;
+        }
+
+
+        if ($request->status == 2) {
+            $data['approved_by'] = $leave->approved_by;
+        } else {
+            $data['rejected_by'] = $leave->rejected_by;
+            $data['rejection_reason'] = $leave->rejection_reason;
+        }
+
         return response()->json([
             'success' => true,
             'message' => $request->status == 2
                 ? 'Leave approved successfully'
                 : 'Leave rejected successfully',
-            'data' => $leave
+            'data' => $data
         ], 200);
     }
 }

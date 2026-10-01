@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreStaffRequest;
+use App\Http\Requests\StaffSearchRequest;
 use App\Http\Requests\UpdateStaffRequest;
 use App\Services\StaffService;
 
@@ -17,9 +18,20 @@ class StaffController extends Controller
     }
 
     // Get all staff
-    public function index()
+    public function index(StaffSearchRequest $request)
     {
-        $staff = $this->staffService->getAllStaff();
+        $staff = $this->staffService->getAllStaff(
+            $request->type,
+            $request->value
+        );
+
+        if ($staff->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No staff found',
+                'data' => null
+            ], 404);
+        }
 
         return response()->Json([
             'success' => true,
