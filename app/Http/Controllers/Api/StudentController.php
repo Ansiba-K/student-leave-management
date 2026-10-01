@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreStudentRequest;
 use App\Http\Requests\UpdateStudentRequest;
 use App\Services\StudentService;
+use App\Http\Requests\StudentSearchRequest;
 use Illuminate\Http\Request;
 
 class StudentController extends Controller
@@ -17,18 +18,19 @@ class StudentController extends Controller
         $this->studentService = $studentService;
     }
 
-    // Get all students
-    public function index(Request $request)
+    // Get all students and search students by type and value
+    public function index(StudentSearchRequest $request)
     {
         $students = $this->studentService->getAllStudents(
-            $request->search ?? null
-        );
+        $request->type,
+        $request->value
+    );
 
         if ($students->isEmpty()) {
             return response()->json([
                 'success' => false,
                 'message' => 'No students found',
-                'data' => []
+                'data' => null
             ], 404);
         }
 

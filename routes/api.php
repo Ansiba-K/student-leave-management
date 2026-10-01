@@ -26,15 +26,22 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // leave routes
-Route::post('/leaves', [LeaveController::class, 'store']);
+Route::post('student/leaves', [LeaveController::class, 'storeStudentLeave']);
 Route::get('/leaves/student/{student_id}', [LeaveController::class, 'studentLeaves']);
-Route::put('/leaves/student/{student_id}/cancel', [LeaveController::class, 'cancel']);
+Route::put('/leaves/student/{student_id}/cancel', [LeaveController::class, 'cancelStudentLeave']);
+
 
 // staff routes
 Route::prefix('staff')->group(function () {
     // Staff leave management
-    Route::get('/leaves', [LeaveController::class, 'index']);
+    Route::post('/leaves', [LeaveController::class, 'storeStaffLeave']);
+    Route::get('/student-leaves', [LeaveController::class, 'allStudentLeaves']);
+    Route::get('/staff-leaves', [LeaveController::class, 'allStaffLeaves']);
+    Route::get('/leaves/{staff_id}', [LeaveController::class, 'staffLeaves']);
+    Route::put('/leaves/{staff_id}/cancel', [LeaveController::class, 'cancelStaffLeave']);
+    // approve or reject leave
     Route::put('/leaves/{id}', [LeaveController::class, 'updateStatus']);
+    
 
     // Staff CRUD
     Route::post('/', [StaffController::class, 'store']);
