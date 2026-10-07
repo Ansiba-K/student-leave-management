@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\LeaveController;
 use  App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\LeaveBalanceController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\TestMail;
 
@@ -41,6 +42,8 @@ Route::prefix('staff')->group(function () {
     Route::put('/leaves/{staff_id}/cancel', [LeaveController::class, 'cancelStaffLeave']);
     // approve or reject leave
     Route::put('/leaves/{id}', [LeaveController::class, 'updateStatus']);
+    // leave balance management
+    Route::post('/leave-balances', [LeaveBalanceController::class, 'store']);
     
 
     // Staff CRUD

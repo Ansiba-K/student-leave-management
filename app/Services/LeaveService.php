@@ -6,9 +6,17 @@ use App\Models\Leave;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\LeaveAppliedMail;
+use App\Services\LeaveBalanceService;
 
 class LeaveService
 {
+    private $leaveBalanceService;
+
+    public function __construct(LeaveBalanceService $leaveBalanceService)
+    {
+        $this->leaveBalanceService = $leaveBalanceService;
+    }
+
     public function applyStudentLeave(array $data)
     {
 
@@ -98,11 +106,32 @@ class LeaveService
             return false;
         }
 
+        // Check leave balance
+        $year = \Carbon\Carbon::parse($data['from_date'])->year;
+
+        $remainingDays = $this->leaveBalanceService->getRemainingDays(
+            $data['staff_id'],
+            $data['leave_type_id'],
+            $year
+        );
+
+        if ($remainingDays === null) {
+            return 'balance_not_found';
+        }
+
         // Calculate total leave days
         $fromDate = \Carbon\Carbon::parse($data['from_date']);
         $toDate = \Carbon\Carbon::parse($data['to_date']);
 
         $totalLeaveDays = $fromDate->diffInDays($toDate) + 1;
+
+        if ($data['leave_session'] == 2 || $data['leave_session'] == 3) {
+            $totalLeaveDays = $totalLeaveDays * 0.5;
+        }
+
+        if ($totalLeaveDays > $remainingDays) {
+            return 'insufficient_balance';
+        }
 
         $data['student_id'] = null;
         $data['applicant_type'] = 2;
@@ -126,6 +155,8 @@ class LeaveService
                 'staff.name as staff_name',
                 'leaves.from_date',
                 'leaves.to_date',
+                'leaves.leave_type_id',
+                'leaves.leave_session',
                 'leaves.reason',
                 'leaves.status',
                 'leaves.approved_by',
@@ -387,7 +418,7 @@ class LeaveService
             ->where('applicant_type', 2)
             ->first();
 
-        
+
         if (!$leave) {
             return null;
         }
