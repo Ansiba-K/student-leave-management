@@ -55,6 +55,22 @@ class LeaveController extends Controller
             $request->validated()
         );
 
+        if ($leave === 'balance_not_found') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leave balance not found for this staff and leave type',
+                'data' => null
+            ], 422);
+        }
+
+        if ($leave === 'insufficient_balance') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Insufficient leave balance',
+                'data' => null
+            ], 422);
+        }
+
         if ($leave === false) {
             return response()->json([
                 'success' => false,
