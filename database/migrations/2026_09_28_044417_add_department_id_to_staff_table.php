@@ -15,13 +15,13 @@ class AddDepartmentIdToStaffTable extends Migration
     {
         Schema::table('staff', function (Blueprint $table) {
             $table->unsignedBigInteger('department_id')
-              ->nullable()
-              ->after('id');
+                ->nullable()
+                ->after('id');
 
             $table->foreign('department_id')
-              ->references('id')
-              ->on('departments');
-    });
+                ->references('id')
+                ->on('departments');
+        });
     }
 
     /**
@@ -33,9 +33,9 @@ class AddDepartmentIdToStaffTable extends Migration
     {
         Schema::table('staff', function (Blueprint $table) {
             Schema::table('staff', function (Blueprint $table) {
-        $table->dropForeign(['department_id']);
-        $table->dropColumn('department_id');
-    });
+                $table->dropForeign(['department_id']);
+                $table->dropColumn('department_id');
+            });
         });
     }
 }

@@ -16,25 +16,25 @@ class CreateLeavesTable extends Migration
         Schema::create('leaves', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('student_id');
-        $table->unsignedBigInteger('approved_by')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
 
-        $table->date('from_date');
-        $table->date('to_date');
-        $table->text('reason');
+            $table->date('from_date');
+            $table->date('to_date');
+            $table->text('reason');
 
-        $table->string('status')->default('pending');
-        $table->text('rejection_reason')->nullable();
+            $table->string('status')->default('pending');
+            $table->text('rejection_reason')->nullable();
             $table->timestamps();
 
-        $table->foreign('student_id')
-          ->references('id')
-          ->on('students')
-          ->onDelete('cascade');
+            $table->foreign('student_id')
+                ->references('id')
+                ->on('students')
+                ->onDelete('cascade');
 
-        $table->foreign('approved_by')
-          ->references('id')
-          ->on('staff')
-          ->onDelete('set null');
+            $table->foreign('approved_by')
+                ->references('id')
+                ->on('staff')
+                ->onDelete('set null');
         });
     }
 
