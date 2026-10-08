@@ -247,11 +247,18 @@ class LeaveController extends Controller
             ], 404);
         }
 
-        // Leave is already approved/rejected/cancelled
-        if ($leave === 'not_pending') {
+        if ($leave === 'rejected') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only pending leave can be cancelled',
+                'message' => 'Rejected leave cannot be cancelled',
+                'data' => null
+            ], 422);
+        }
+
+        if ($leave === 'cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leave is already cancelled',
                 'data' => null
             ], 422);
         }
@@ -383,4 +390,5 @@ class LeaveController extends Controller
             'data' => $data
         ], 200);
     }
+
 }
