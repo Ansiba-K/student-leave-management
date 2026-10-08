@@ -32,4 +32,22 @@ class StoreStaffLeaveRequest extends FormRequest
             'reason' => 'required|string',
         ];
     }
+
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+
+            if (
+                in_array((int) $this->leave_session, [2, 3], true) &&
+                $this->from_date !== $this->to_date
+            ) {
+                $validator->errors()->add(
+                    'to_date',
+                    'Forenoon or Afternoon leave can only be applied for a single day'
+                );
+            }
+        });
+    }
 }
+
+

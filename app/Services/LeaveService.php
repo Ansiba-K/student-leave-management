@@ -86,6 +86,7 @@ class LeaveService
         return $response;
     }
 
+    // Staff leave application
     public function applyStaffLeave($data)
     {
         // Get the staff member who is applying for leave
@@ -93,30 +94,58 @@ class LeaveService
             ->where('id', $data['staff_id'])
             ->first();
 
+        // Half-day leave check
+        if ($data['leave_session'] != 1) {
 
-        $existingLeave = DB::table('leaves')
-            ->where('staff_id', $data['staff_id'])
-            ->where('applicant_type', 2)
-            ->whereIn('status', [1, 2])
-            ->where('from_date', '<=', $data['to_date'])
-            ->where('to_date', '>=', $data['from_date'])
-            ->first();
+            $existingLeaves = DB::table('leaves')
+                ->where('staff_id', $data['staff_id'])
+                ->where('applicant_type', 2)
+                ->whereIn('status', [1, 2])
+                ->where('from_date', '<=', $data['from_date'])
+                ->where('to_date', '>=', $data['from_date'])
+                ->get();
 
-        if ($existingLeave) {
-            return false;
+            foreach ($existingLeaves as $leave) {
+
+                // Existing Full Day
+                if ($leave->leave_session == 1) {
+                    return false;
+                }
+
+                // Same session already exists
+                if ($leave->leave_session == $data['leave_session']) {
+                    return false;
+                }
+            }
+        } else {
+
+            $existingLeave = DB::table('leaves')
+                ->where('staff_id', $data['staff_id'])
+                ->where('applicant_type', 2)
+                ->whereIn('status', [1, 2])
+                ->where('from_date', '<=', $data['to_date'])
+                ->where('to_date', '>=', $data['from_date'])
+                ->first();
+
+            if ($existingLeave) {
+                return false;
+            }
         }
 
         // Check leave balance
         $year = \Carbon\Carbon::parse($data['from_date'])->year;
+        $remainingDays = null;
 
-        $remainingDays = $this->leaveBalanceService->getRemainingDays(
-            $data['staff_id'],
-            $data['leave_type_id'],
-            $year
-        );
+        if ($data['leave_type_id'] != 3) {
+            $remainingDays = $this->leaveBalanceService->getRemainingDays(
+                $data['staff_id'],
+                $data['leave_type_id'],
+                $year
+            );
 
-        if ($remainingDays === null) {
-            return 'balance_not_found';
+            if ($remainingDays === null) {
+                return 'balance_not_found';
+            }
         }
 
         // Calculate total leave days
@@ -129,7 +158,7 @@ class LeaveService
             $totalLeaveDays = $totalLeaveDays * 0.5;
         }
 
-        if ($totalLeaveDays > $remainingDays) {
+        if ($data['leave_type_id'] != 3 && $totalLeaveDays > $remainingDays) {
             return 'insufficient_balance';
         }
 
@@ -237,6 +266,7 @@ class LeaveService
 
         $leaves = DB::table('leaves')
             ->join('staff', 'leaves.staff_id', '=', 'staff.id')
+            ->join('leave_types', 'leaves.leave_type_id', '=', 'leave_types.id')
             ->where('leaves.applicant_type', 2)
             ->select(
                 'leaves.id as leave_id',
@@ -244,6 +274,8 @@ class LeaveService
                 'staff.name as staff_name',
                 'leaves.from_date',
                 'leaves.to_date',
+                'leaves.leave_session',
+                'leave_types.name as leave_type',
                 'leaves.reason',
                 'leaves.status',
                 'leaves.approved_by',
@@ -262,7 +294,12 @@ class LeaveService
             $fromDate = \Carbon\Carbon::parse($leave->from_date);
             $toDate = \Carbon\Carbon::parse($leave->to_date);
 
-            $leave->total_leave_days = $fromDate->diffInDays($toDate) + 1;
+            $totalLeaveDays = $fromDate->diffInDays($toDate) + 1;
+            if ($leave->leave_session == 2 || $leave->leave_session == 3) {
+                $totalLeaveDays = $totalLeaveDays * 0.5;
+            }
+
+            $leave->total_leave_days = $totalLeaveDays;
 
             // Convert numeric status to readable status
             if ($leave->status == 1) {
@@ -423,9 +460,34 @@ class LeaveService
             return null;
         }
 
-        // Only pending leave can be cancelled
-        if ($leave->status != 1) {
-            return 'not_pending';
+        // Already rejected
+        if ($leave->status == 3) {
+            return 'rejected';
+        }
+
+        // Already cancelled
+        if ($leave->status == 4) {
+            return 'cancelled';
+        }
+
+        // If approved leave is cancelled, reduce used days
+        if ($leave->status == 2 && $leave->leave_type_id != 3) {
+
+            $fromDate = \Carbon\Carbon::parse($leave->from_date);
+            $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+            $leaveDays = $fromDate->diffInDays($toDate) + 1;
+
+            // Half-day leave
+            if ($leave->leave_session == 2 || $leave->leave_session == 3) {
+                $leaveDays = $leaveDays * 0.5;
+            }
+
+            DB::table('leave_balances')
+                ->where('staff_id', $leave->staff_id)
+                ->where('leave_type_id', $leave->leave_type_id)
+                ->where('year', $fromDate->year)
+                ->decrement('used_days', $leaveDays);
         }
 
         // Cancel the leave
@@ -529,6 +591,24 @@ class LeaveService
 
         if ($status == 2) {
             $rejectionReason = null;
+        }
+
+        if ($status == 2 && $leave->applicant_type == 2 && $leave->leave_type_id != 3) {
+
+            $fromDate = \Carbon\Carbon::parse($leave->from_date);
+            $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+            $leaveDays = $fromDate->diffInDays($toDate) + 1;
+
+            if ($leave->leave_session == 2 || $leave->leave_session == 3) {
+                $leaveDays = $leaveDays * 0.5;
+            }
+
+            DB::table('leave_balances')
+                ->where('staff_id', $leave->staff_id)
+                ->where('leave_type_id', $leave->leave_type_id)
+                ->where('year', $fromDate->year)
+                ->increment('used_days', $leaveDays);
         }
 
         // update leave status

@@ -44,6 +44,7 @@ Route::prefix('staff')->group(function () {
     Route::put('/leaves/{id}', [LeaveController::class, 'updateStatus']);
     // leave balance management
     Route::post('/leave-balances', [LeaveBalanceController::class, 'store']);
+    Route::get('/{staff_id}/leave-balances', [LeaveBalanceController::class, 'index']);
     
 
     // Staff CRUD
