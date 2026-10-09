@@ -349,8 +349,8 @@ class LeaveService
             $fromDate = \Carbon\Carbon::parse($leave->from_date);
             $toDate = \Carbon\Carbon::parse($leave->to_date);
 
-            $leave->total_leave_days =
-                $fromDate->diffInDays($toDate) + 1;
+            $leave->total_leave_days = $fromDate->diffInDays($toDate) + 1;
+
 
             if ($leave->status == 1) {
                 $leave->status = 'Pending';
@@ -371,6 +371,7 @@ class LeaveService
         // Get leaves for the selected staff
         $query = DB::table('leaves')
             ->join('staff', 'leaves.staff_id', '=', 'staff.id')
+            ->join('leave_types', 'leaves.leave_type_id', '=', 'leave_types.id')
             ->where('leaves.staff_id', $staffId)
             ->where('leaves.applicant_type', 2)
             ->select(
@@ -378,9 +379,12 @@ class LeaveService
                 'leaves.staff_id',
                 'leaves.from_date',
                 'leaves.to_date',
+                'leaves.leave_session',
+                'leaves.leave_type_id',
+                'leave_types.name as leave_type',
                 'leaves.reason',
                 'leaves.status',
-                'leaves.rejection_reason'
+                'leaves.rejection_reason',
             )
             ->orderBy('leaves.id', 'desc');
 
@@ -397,8 +401,13 @@ class LeaveService
             $fromDate = \Carbon\Carbon::parse($leave->from_date);
             $toDate = \Carbon\Carbon::parse($leave->to_date);
 
-            $leave->total_leave_days =
-                $fromDate->diffInDays($toDate) + 1;
+            $totalLeaveDays = $fromDate->diffInDays($toDate) + 1;
+
+            if ($leave->leave_session == 2 || $leave->leave_session == 3) {
+                $totalLeaveDays = $totalLeaveDays * 0.5;
+            }
+
+            $leave->total_leave_days = $totalLeaveDays;
 
             if ($leave->status == 1) {
                 $leave->status = 'Pending';
