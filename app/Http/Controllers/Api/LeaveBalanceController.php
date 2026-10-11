@@ -59,6 +59,18 @@ class LeaveBalanceController extends Controller
             ], 200);
         }
 
+
+        if (
+            $leaveTypeId !== null &&
+            !DB::table('leave_types')->where('id', $leaveTypeId)->exists()
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leave type does not exist',
+                'data' => null
+            ], 404);
+        }
+
         // casual/sick
         $balances = $this->leaveBalanceService
             ->getStaffBalances($staffId, $leaveTypeId);
