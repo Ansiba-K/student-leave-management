@@ -25,7 +25,7 @@ class StoreLeaveBalanceRequest extends FormRequest
     {
         return [
             'staff_id' => 'required|exists:staff,id',
-            'leave_type_id' => 'required|exists:leave_types,id',
+            'leave_type_id' => 'required|exists:leave_types,id|not_in:3',
             'year' => 'required|integer',
             'allocated_days' => 'required|numeric|min:0',
         ];
