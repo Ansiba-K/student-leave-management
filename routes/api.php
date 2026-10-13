@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\LeaveBalanceController;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\TestMail;
+use App\Http\Controllers\LeaveNotificationController;
 
 
 /*
@@ -45,6 +46,10 @@ Route::prefix('staff')->group(function () {
     // leave balance management
     Route::post('/leave-balances', [LeaveBalanceController::class, 'store']);
     Route::get('/leave-balances/{staff_id}', [LeaveBalanceController::class, 'index']);
+    Route::put('/leave-balances/{staff_id}', [LeaveBalanceController::class, 'update']);
+    // leave notifications
+    Route::get('/leave-notifications/{staff_id}', [LeaveNotificationController::class, 'index']);
+    Route::put('/leave-notifications/{staff_id}/{notification_id}/read', [LeaveNotificationController::class, 'markAsRead']);
     
 
     // Staff CRUD

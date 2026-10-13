@@ -7,14 +7,18 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\LeaveAppliedMail;
 use App\Services\LeaveBalanceService;
+use App\Services\LeaveNotificationService;
+use App\Jobs\CreateLeaveNotificationJob;
 
 class LeaveService
 {
     private $leaveBalanceService;
+    private $leaveNotificationService;
 
-    public function __construct(LeaveBalanceService $leaveBalanceService)
+    public function __construct(LeaveBalanceService $leaveBalanceService, LeaveNotificationService $leaveNotificationService)
     {
         $this->leaveBalanceService = $leaveBalanceService;
+        $this->leaveNotificationService = $leaveNotificationService;
     }
 
     public function applyStudentLeave(array $data)
@@ -514,126 +518,188 @@ class LeaveService
 
 
     // Approve or reject a leave
+
     public function updateLeaveStatus(
         $leaveId,
         $status,
         $staffId,
         $rejectionReason = null
     ) {
-
-        $leave = DB::table('leaves')
-            ->where('id', $leaveId)
-            ->first();
-
-        if (!$leave) {
-            return null;
+        // Only approval and rejection are allowed here
+        if (!in_array((int) $status, [2, 3], true)) {
+            return 'invalid_status';
         }
 
-        // Find the staff 
-        $staff = DB::table('staff')
-            ->where('id', $staffId)
-            ->first();
-
-        if (!$staff) {
-            return 'staff_not_found';
-        }
-
-
-        if ($staff->is_authority != 1) {
-            return 'not_authorized';
-        }
-
-        // Get the applicant's department
-        if ($leave->applicant_type == 1) {
-
-
-            $applicant = DB::table('students')
-                ->where('id', $leave->student_id)
+        // Perform the database changes atomically
+        $result = DB::transaction(function () use (
+            $leaveId,
+            $status,
+            $staffId,
+            $rejectionReason
+        ) {
+            // Lock the leave row to prevent simultaneous processing
+            $leave = DB::table('leaves')
+                ->where('id', $leaveId)
+                ->lockForUpdate()
                 ->first();
 
-            if (!$applicant) {
-                return 'student_not_found';
+            if (!$leave) {
+                return 'leave_not_found';
             }
 
-            $applicantDepartmentId = $applicant->department_id;
-        } else {
+            // Check the current status
+            if ($leave->status == 2) {
+                return 'approved';
+            }
 
-            // Staff leave
-            $applicant = DB::table('staff')
-                ->where('id', $leave->staff_id)
+            if ($leave->status == 3) {
+                return 'rejected';
+            }
+
+            if ($leave->status == 4) {
+                return 'cancelled';
+            }
+
+            if ($leave->status != 1) {
+                return 'invalid_status';
+            }
+
+            // Find the authority
+            $staff = DB::table('staff')
+                ->where('id', $staffId)
                 ->first();
 
-            if (!$applicant) {
+            if (!$staff) {
                 return 'staff_not_found';
             }
 
-            // Staff cannot approve their own leave
-            if ($leave->staff_id == $staffId) {
-                return 'self_approval_not_allowed';
+            if ($staff->is_authority != 1) {
+                return 'not_authorized';
             }
 
-            $applicantDepartmentId = $applicant->department_id;
-        }
+            // Find the applicant and department
+            if ($leave->applicant_type == 1) {
+                $applicant = DB::table('students')
+                    ->where('id', $leave->student_id)
+                    ->first();
 
+                if (!$applicant) {
+                    return 'student_not_found';
+                }
+            } else {
+                $applicant = DB::table('staff')
+                    ->where('id', $leave->staff_id)
+                    ->first();
 
-        if ($staff->role != 3) {
-            if ($staff->department_id != $applicantDepartmentId) {
+                if (!$applicant) {
+                    return 'staff_not_found';
+                }
+
+                if ($leave->staff_id == $staffId) {
+                    return 'self_approval_not_allowed';
+                }
+            }
+
+            if (
+                $staff->role != 3 &&
+                $staff->department_id != $applicant->department_id
+            ) {
                 return 'different_department';
             }
-        }
 
-
-        if ($leave->status == 2) {
-            return 'approved';
-        }
-
-
-        if ($leave->status == 3) {
-            return 'rejected';
-        }
-
-
-        if ($leave->status == 4) {
-            return 'cancelled';
-        }
-
-
-        if ($status == 2) {
-            $rejectionReason = null;
-        }
-
-        if ($status == 2 && $leave->applicant_type == 2 && $leave->leave_type_id != 3) {
-
-            $fromDate = \Carbon\Carbon::parse($leave->from_date);
-            $toDate = \Carbon\Carbon::parse($leave->to_date);
-
-            $leaveDays = $fromDate->diffInDays($toDate) + 1;
-
-            if ($leave->leave_session == 2 || $leave->leave_session == 3) {
-                $leaveDays = $leaveDays * 0.5;
+            if ($status == 2) {
+                $rejectionReason = null;
             }
 
-            DB::table('leave_balances')
-                ->where('staff_id', $leave->staff_id)
-                ->where('leave_type_id', $leave->leave_type_id)
-                ->where('year', $fromDate->year)
-                ->increment('used_days', $leaveDays);
+            // Deduct balance only for approved, paid staff leave
+            if (
+                $status == 2 &&
+                $leave->applicant_type == 2 &&
+                $leave->leave_type_id != 3
+            ) {
+                $fromDate = \Carbon\Carbon::parse($leave->from_date);
+                $toDate = \Carbon\Carbon::parse($leave->to_date);
+
+                $leaveDays = $fromDate->diffInDays($toDate) + 1;
+
+                if (in_array((int) $leave->leave_session, [2, 3], true)) {
+                    $leaveDays *= 0.5;
+                }
+
+                // Lock the balance before checking available days
+                $balance = DB::table('leave_balances')
+                    ->where('staff_id', $leave->staff_id)
+                    ->where('leave_type_id', $leave->leave_type_id)
+                    ->where('year', $fromDate->year)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$balance) {
+                    return 'balance_not_found';
+                }
+
+                $remainingDays =
+                    (float) $balance->allocated_days -
+                    (float) $balance->used_days;
+
+                if ($remainingDays < $leaveDays) {
+                    return 'insufficient_balance';
+                }
+
+                // Deduct the days while holding the row lock
+                DB::table('leave_balances')
+                    ->where('id', $balance->id)
+                    ->increment('used_days', $leaveDays);
+            }
+
+            // Update the leave status in the same transaction
+            DB::table('leaves')
+                ->where('id', $leaveId)
+                ->where('status', 1)
+                ->update([
+                    'status' => $status,
+                    'approved_by' => $status == 2 ? $staffId : null,
+                    'rejected_by' => $status == 3 ? $staffId : null,
+                    'rejection_reason' => $rejectionReason,
+                    'updated_at' => now(),
+                ]);
+
+            return [
+                'leave' => DB::table('leaves')
+                    ->where('id', $leaveId)
+                    ->first(),
+                'applicant_type' => $leave->applicant_type,
+                'staff_id' => $leave->staff_id,
+            ];
+        });
+
+        // Do not dispatch a notification if the transaction returned an error
+        if (is_string($result)) {
+            return $result;
         }
 
-        // update leave status
-        DB::table('leaves')
-            ->where('id', $leaveId)
-            ->update([
-                'status' => $status,
-                'approved_by' => $status == 2 ? $staffId : null,
-                'rejected_by' => $status == 3 ? $staffId : null,
-                'rejection_reason' => $rejectionReason,
-                'updated_at' => now(),
-            ]);
+        // Dispatch the notification after the transaction commits
+        if (
+            $result['applicant_type'] == 2 &&
+            in_array((int) $status, [2, 3], true)
+        ) {
+            if ($status == 2) {
+                $title = 'Leave Approved';
+                $message = 'Your leave application has been approved.';
+            } else {
+                $title = 'Leave Rejected';
+                $message = 'Your leave application has been rejected. Reason: '
+                    . $rejectionReason;
+            }
 
+            CreateLeaveNotificationJob::dispatch(
+                $result['staff_id'],
+                $leaveId,
+                $title,
+                $message
+            );
+        }
 
-        return DB::table('leaves')
-            ->where('id', $leaveId)
-            ->first();
+        return $result['leave'];
     }
 }
