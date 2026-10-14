@@ -11,19 +11,26 @@ class LeaveAppliedMail extends Mailable
     use Queueable, SerializesModels;
 
     public $leave;
-    public $student;
+    public $applicant;
+    public $applicantType;
+
 
     // Receive leave and student information
-    public function __construct($leave, $student)
+    public function __construct($leave, $applicant, $applicantType)
     {
         $this->leave = $leave;
-        $this->student = $student;
+        $this->applicant = $applicant;
+        $this->applicantType = $applicantType;
     }
 
     // Build the email
     public function build()
     {
-        return $this->subject('New Student Leave Application')
-                    ->view('emails.leave_applied');
+        $subject = $this->applicantType == 1
+            ? 'New Student Leave Application'
+            : 'New Staff Leave Application';
+
+        return $this->subject($subject)
+            ->view('emails.leave_applied');
     }
 }

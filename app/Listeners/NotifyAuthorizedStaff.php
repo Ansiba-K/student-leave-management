@@ -5,6 +5,8 @@ namespace App\Listeners;
 use App\Events\LeaveApplied;
 use App\Jobs\CreateLeaveNotificationJob;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LeaveAppliedMail;
 
 class NotifyAuthorizedStaff
 {
@@ -69,6 +71,20 @@ class NotifyAuthorizedStaff
                 'New Leave Application',
                 'A new leave application has been submitted and is awaiting review.'
             );
+
+            // Find the recipient's email address
+            $recipient = DB::table('staff')
+                ->where('id', $staffId)
+                ->first();
+
+            if ($recipient && $recipient->email) {
+                Mail::to($recipient->email)
+                    ->queue(new LeaveAppliedMail(
+                        $leave,
+                        $applicant,
+                        $leave->applicant_type
+                    ));
+            }
         }
     }
 }

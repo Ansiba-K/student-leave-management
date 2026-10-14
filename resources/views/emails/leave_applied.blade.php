@@ -5,11 +5,11 @@
 </head>
 <body>
 
-    <h2>New Student Leave Application</h2>
+    <h2>New Leave Application</h2>
 
-    <p>A student has applied for leave.</p>
+    <p>An applicant has applied for leave.</p>
 
-    <p><strong>Student:</strong> {{ $student->name }}</p>
+    <p><strong>Applicant:</strong> {{ $applicant->name }}</p>
 
     <p><strong>From:</strong> {{ $leave->from_date }}</p>
 

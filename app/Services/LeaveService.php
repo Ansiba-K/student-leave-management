@@ -86,7 +86,7 @@ class LeaveService
         // Send email to authority staff and HOD
         if (!empty($approvers)) {
             Mail::to($approvers)
-                ->send(new LeaveAppliedMail($leave, $student));
+                ->send(new LeaveAppliedMail($leave, $student, 1));
         }
         return $response;
     }
