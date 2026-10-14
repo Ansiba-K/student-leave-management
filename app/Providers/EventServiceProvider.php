@@ -18,6 +18,10 @@ class EventServiceProvider extends ServiceProvider
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
+        \App\Events\LeaveApplied::class => [
+            \App\Listeners\LogLeaveApplication::class,
+            \App\Listeners\NotifyAuthorizedStaff::class,
+        ],
     ];
 
     /**

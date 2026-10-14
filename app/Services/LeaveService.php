@@ -9,6 +9,7 @@ use App\Mail\LeaveAppliedMail;
 use App\Services\LeaveBalanceService;
 use App\Services\LeaveNotificationService;
 use App\Jobs\CreateLeaveNotificationJob;
+use App\Events\LeaveApplied;
 
 class LeaveService
 {
@@ -177,6 +178,7 @@ class LeaveService
 
         // Insert the staff leave
         $id = DB::table('leaves')->insertGetId($data);
+        LeaveApplied::dispatch($id, 2);
 
         // Get the staff leave with staff name
         $leave = DB::table('leaves')
